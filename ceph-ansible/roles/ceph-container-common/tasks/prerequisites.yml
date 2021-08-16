@@ -1,0 +1,36 @@
+---
+- name: lvmetad tasks related
+  when:
+    - inventory_hostname in groups.get(osd_group_name, [])
+    - lvmetad_disabled | default(False) | bool
+    - ansible_facts['os_family'] == 'RedHat'
+    - ansible_facts['distribution_major_version'] | int == 7
+  block:
+    - name: stop lvmetad
+      service:
+        name: lvm2-lvmetad
+        state: stopped
+
+    - name: disable and mask lvmetad service
+      service:
+        name: lvm2-lvmetad
+        enabled: no
+        masked: yes
+
+- name: remove ceph udev rules
+  file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - /usr/lib/udev/rules.d/95-ceph-osd.rules
+    - /usr/lib/udev/rules.d/60-ceph-by-parttypeuuid.rules
+
+- name: ensure tmpfiles.d is present
+  lineinfile:
+    path: /etc/tmpfiles.d/ceph-common.conf
+    line: "d /run/ceph 0770 root root -"
+    owner: root
+    group: root
+    mode: 0644
+    state: present
+    create: yes
